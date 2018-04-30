@@ -1,0 +1,33 @@
+notifications:
+  email: false
+
+sudo: false
+
+language: php
+
+php: 7.1
+
+matrix:
+  fast_finish: true
+
+cache:
+  directories:
+    - vendor
+
+install:
+  - alias composer=composer\ -n && composer selfupdate
+  - composer validate
+  - composer update --no-progress --no-suggest $DEPENDENCIES
+
+before_script:
+  - echo "https://$GITHUB_TOKEN:@github.com" > ~/.git-credentials
+
+  - git clone --depth=1 https://github.com/250/Steam-data.git ${datadir=~/Steam-data}
+      -c user.name=Travis
+      -c user.email=bilge+travis@scriptfusion.com
+      -c credential.helper=store
+
+script:
+  - db=$datadir/$("$datadir/bin/latest")
+  - 'echo "db: \"$db\""'
+  - bin/curator sync "$db" 32686107 SteamTop250 -p "$STEAM_PASSWORD" || exit
