@@ -5,12 +5,14 @@ namespace ScriptFUSION\Steam250\Curator;
 
 use Amp\Loop;
 use Amp\Producer;
+use Amp\Promise;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use ScriptFUSION\Async\Throttle\Throttle;
 use ScriptFUSION\Porter\Porter;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\PutCuratorReview;
+use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\RecommendationState;
 use ScriptFUSION\Porter\Specification\AsyncImportSpecification;
 
 class ReviewSynchroniser
@@ -48,13 +50,13 @@ class ReviewSynchroniser
     {
         $this->logger->info('Beginning review synchronization...');
 
-        $reviews = new Producer(function (\Closure $emit): \Generator {
+        $apps = new Producer(function (\Closure $emit): \Generator {
             $number = new \NumberFormatter(self::LANG, \NumberFormatter::DEFAULT_STYLE);
             $percent = new \NumberFormatter(self::LANG, \NumberFormatter::PERCENT);
             $ordinal = new \NumberFormatter(self::LANG, \NumberFormatter::ORDINAL);
 
             $query = $this->database->executeQuery('
-                SELECT rank.*, app.name, app.total_reviews, app.positive_reviews, total
+                SELECT rank.*, name, total_reviews, positive_reviews, total
                 FROM rank, (SELECT COUNT(*) as total FROM rank WHERE list_id = \'index\')
                 INNER JOIN app ON rank.app_id = app.id
                 WHERE list_id = \'index\'
@@ -79,10 +81,11 @@ class ReviewSynchroniser
                                         . ' Steam game of all time, with '
                                         . $percent->format($app['positive_reviews'] / $app['total_reviews'])
                                         . " positive reviews from {$number->format($app['total_reviews'])} gamers!",
+                                    RecommendationState::RECOMMENDED(),
                                     "https://steam250.com/#app/$app[app_id]/" . rawurlencode($app['name'])
                                 )
                             )),
-                            $app
+                            $app,
                         ];
                     })
                 ));
@@ -93,11 +96,12 @@ class ReviewSynchroniser
 
         $errors = false;
 
-        Loop::run(function () use ($reviews, &$errors): \Generator {
+        Loop::run(function () use ($apps, &$errors): \Generator {
             $count = 0;
+            $updated = [];
 
-            while (yield $reviews->advance()) {
-                [$response, $app] = $reviews->getCurrent();
+            while (yield $apps->advance()) {
+                [$response, $app] = $apps->getCurrent();
                 $percent = ++$count / $app['total'] * 100 | 0;
 
                 if ($response['success'] === 1) {
@@ -107,9 +111,42 @@ class ReviewSynchroniser
 
                     $errors = true;
                 }
+
+                $updated[] = $app['app_id'];
             }
+
+            yield $this->archiveObsoleteReviews($updated);
         });
 
         return !$errors;
+    }
+
+    private function archiveObsoleteReviews(array $freshAppIds): Promise
+    {
+        return \Amp\call(function () use ($freshAppIds) {
+            $staleApps = $this->porter->importAsync(
+                new ObsoleteReviewsSpecification($this->session, $this->curatorId, $freshAppIds)
+            );
+
+            if (!yield $staleApps->advance()) {
+                $this->logger->info('No obsolete reviews found.');
+
+                return;
+            }
+
+            do {
+                $stale = $staleApps->getCurrent();
+
+                $this->logger->info("Archived obsolete review: $stale[app_name].");
+
+                yield $this->porter->importOneAsync(new AsyncImportSpecification(new PutCuratorReview(
+                    $this->session,
+                    $this->curatorId,
+                    (string)$stale['appid'],
+                    "$stale[app_name] was a member of the Steam Top 250 until " . date('F jS, Y.'),
+                    RecommendationState::INFORMATIONAL()
+                )));
+            } while (yield $staleApps->advance());
+        });
     }
 }
