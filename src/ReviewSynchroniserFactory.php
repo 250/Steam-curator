@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator;
 
-use Monolog\Logger;
+use ScriptFUSION\Steam250\Shared\Log\LoggerFactory;
 
 final class ReviewSynchroniserFactory
 {
@@ -20,7 +20,7 @@ final class ReviewSynchroniserFactory
             $curatorId,
             $porter,
             (new DatabaseFactory)->create($dbPath),
-            new Logger('Curator')
+            (new LoggerFactory)->create('Curator', false)
         );
     }
 }
