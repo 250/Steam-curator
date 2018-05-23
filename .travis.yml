@@ -20,14 +20,8 @@ install:
   - composer update --no-progress --no-suggest $DEPENDENCIES
 
 before_script:
-  - echo "https://$GITHUB_TOKEN:@github.com" > ~/.git-credentials
-
-  - git clone --depth=1 https://github.com/250/Steam-data.git ${datadir=~/Steam-data}
-      -c user.name=Travis
-      -c user.email=bilge+travis@scriptfusion.com
-      -c credential.helper=store
+  - snapshots=$(vendor/bin/250\ data download-last2 | head -1) && echo "$snapshots"
+  - 'echo "db: \"${db=$(cut -f3 <<<"$snapshots")}\""'
 
 script:
-  - db=$datadir/$("$datadir/bin/latest")
-  - 'echo "db: \"$db\""'
-  - bin/curator sync "$db" 32686107 SteamTop250 -p "$STEAM_PASSWORD" || exit
+  - bin/curator -v sync "$db" 32686107 SteamTop250 -p "$STEAM_PASSWORD" || exit

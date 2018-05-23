@@ -10,6 +10,7 @@
   "require": {
     "php": "^7.1",
     "ext-intl": "*",
+    "250/shared": "dev-master",
     "provider/steam": "dev-async",
     "transformers/mapping-transformer": "5.0.x-dev",
     "scriptfusion/porter": "@dev",
