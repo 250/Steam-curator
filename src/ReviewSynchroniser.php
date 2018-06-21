@@ -43,7 +43,7 @@ class ReviewSynchroniser
         $this->porter = $porter;
         $this->database = $database;
         $this->logger = $logger;
-        $this->throttle = new Throttle;
+        $this->throttle = new Throttle(8, 10);
     }
 
     public function synchronize(): bool
@@ -65,7 +65,7 @@ class ReviewSynchroniser
 
             while ($app = $query->fetch()) {
                 yield $this->throttle->await($emit(
-                    \Amp\call(function () use ($app, $number, $percent, $ordinal) {
+                    \Amp\call(function () use ($app, $number, $percent, $ordinal): \Generator {
                         return [
                             yield $this->porter->importOneAsync(new AsyncImportSpecification(
                                 new PutCuratorReview(
@@ -105,7 +105,10 @@ class ReviewSynchroniser
                 $percent = ++$count / $app['total'] * 100 | 0;
 
                 if ($response['success'] === 1) {
-                    $this->logger->info("$count/$app[total] ($percent%) Synced #$app[app_id] $app[name] OK.");
+                    $this->logger->info(
+                        "$count/$app[total] ($percent%) Synced #$app[app_id] $app[name] OK.",
+                        ['throttle' => $this->throttle]
+                    );
                 } else {
                     $this->logger->error("Failed to sync #$app[app_id] $app[name]! Error code: $response[success].");
 
