@@ -43,7 +43,7 @@ class ReviewSynchroniser
         $this->porter = $porter;
         $this->database = $database;
         $this->logger = $logger;
-        $this->throttle = new Throttle(8, 10);
+        $this->throttle = new Throttle(6, 6);
     }
 
     public function synchronize(): bool
