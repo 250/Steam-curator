@@ -1,14 +1,14 @@
 <?php
 declare(strict_types=1);
 
-namespace ScriptFUSION\Steam250\Curator;
+namespace ScriptFUSION\Steam250\Curator\ImportSpecification;
 
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\ListCuratorReviews;
 use ScriptFUSION\Porter\Specification\AsyncImportSpecification;
 use ScriptFUSION\Porter\Transform\FilterTransformer;
 
-final class ObsoleteReviewsSpecification extends AsyncImportSpecification
+final class ListObsoleteReviewsSpecification extends AsyncImportSpecification
 {
     public function __construct(CuratorSession $session, string $curatorId, array $freshAppIds)
     {

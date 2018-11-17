@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator;
 
+use ScriptFUSION\Steam250\Curator\Database\DatabaseFactory;
 use ScriptFUSION\Steam250\Shared\Log\LoggerFactory;
 
 final class ReviewSynchroniserFactory
