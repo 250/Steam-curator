@@ -27,7 +27,7 @@ final class SyncCommand extends Command
     {
         $synchroniser = (new ReviewSynchroniserFactory)->create(
             $input->getArgument('db'),
-            $input->getArgument('curator id'),
+            $input->getArgument('curator id') | 0,
             $input->getArgument('username'),
             $input->getOption('password')
         );

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator\ImportSpecification;
 
+use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\PutCuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\RecommendationState;
@@ -12,7 +13,7 @@ final class PutSteamTop250ReviewSpecification extends AsyncImportSpecification
 {
     private const LANG = 'en';
 
-    public function __construct(CuratorSession $session, string $curatorId, array $app)
+    public function __construct(CuratorSession $session, int $curatorId, array $app)
     {
         $number = new \NumberFormatter(self::LANG, \NumberFormatter::DEFAULT_STYLE);
         $percent = new \NumberFormatter(self::LANG, \NumberFormatter::PERCENT);
@@ -21,18 +22,19 @@ final class PutSteamTop250ReviewSpecification extends AsyncImportSpecification
         parent::__construct(new PutCuratorReview(
             $session,
             $curatorId,
-            $app['app_id'],
-            'Rated '
-                . (
-                    $app['rank'] === '1'
-                        ? 'number one'
-                        : "{$ordinal->format($app['rank'])} best"
-                )
-                . ' Steam game of all time, with '
-                . $percent->format($app['positive_reviews'] / $app['total_reviews'])
-                . " positive reviews from {$number->format($app['total_reviews'])} gamers!",
-            RecommendationState::RECOMMENDED(),
-            "https://steam250.com/#app/$app[app_id]/" . rawurlencode($app['name'])
+            (new CuratorReview(
+                $app['app_id'] | 0,
+                'Rated '
+                    . (
+                        $app['rank'] === '1'
+                            ? 'number one'
+                            : "{$ordinal->format($app['rank'])} best"
+                    )
+                    . ' Steam game of all time, with '
+                    . $percent->format($app['positive_reviews'] / $app['total_reviews'])
+                    . " positive reviews from {$number->format($app['total_reviews'])} gamers!",
+                RecommendationState::RECOMMENDED()
+            ))->setUrl("https://steam250.com/#app/$app[app_id]/" . rawurlencode($app['name']))
         ));
     }
 }

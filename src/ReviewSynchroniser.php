@@ -10,6 +10,7 @@ use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use ScriptFUSION\Async\Throttle\Throttle;
 use ScriptFUSION\Porter\Porter;
+use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\PutCuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\RecommendationState;
@@ -33,7 +34,7 @@ final class ReviewSynchroniser
 
     public function __construct(
         CuratorSession $session,
-        string $curatorId,
+        int $curatorId,
         Porter $porter,
         Connection $database,
         LoggerInterface $logger
@@ -126,9 +127,11 @@ final class ReviewSynchroniser
                 yield $this->porter->importOneAsync(new AsyncImportSpecification(new PutCuratorReview(
                     $this->session,
                     $this->curatorId,
-                    (string)$stale['appid'],
-                    "$stale[app_name] was a member of the Steam Top 250 until " . date('F jS, Y.'),
-                    RecommendationState::INFORMATIONAL()
+                    new CuratorReview(
+                        $stale['appid'],
+                        "$stale[app_name] was a member of the Steam Top 250 until " . date('F jS, Y.'),
+                        RecommendationState::INFORMATIONAL()
+                    )
                 )));
             } while (yield $staleApps->advance());
         });

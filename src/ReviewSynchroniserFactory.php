@@ -10,7 +10,7 @@ final class ReviewSynchroniserFactory
 {
     public function create(
         string $dbPath,
-        string $curatorId,
+        int $curatorId,
         string $usernameOrCookie,
         string $password = null
     ): ReviewSynchroniser {
