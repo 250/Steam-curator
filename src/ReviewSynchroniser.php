@@ -51,59 +51,118 @@ final class ReviewSynchroniser
     {
         $this->logger->info('Beginning review synchronization...');
 
-        $apps = new Producer(function (\Closure $emit): \Generator {
-            $query = $this->database->executeQuery('
-                SELECT rank.*, name, total_reviews, positive_reviews, total
-                FROM rank, (SELECT COUNT(*) as total FROM rank WHERE list_id = \'index\')
-                INNER JOIN app ON rank.app_id = app.id
-                WHERE list_id = \'index\'
-                ORDER BY rank DESC
-            ');
+        /** @var SyncReviewsStatus $syncReviewsStatus */
+        $syncReviewsStatus = null;
 
-            while ($app = $query->fetch()) {
-                yield $this->throttle->await($emit(
-                    \Amp\call(function () use ($app): \Generator {
-                        return [
-                            yield $this->porter->importOneAsync(
-                                new PutSteamTop250ReviewSpecification($this->session, $this->curatorId, $app)
-                            ),
-                            $app,
-                        ];
-                    })
-                ));
-            }
+        Loop::run(function () use (&$syncReviewsStatus): \Generator {
+            /** @var SyncReviewsStatus $syncReviewsStatus */
+            $syncReviewsStatus = yield $this->synchronizeReviews();
 
-            yield $this->throttle->finish();
+            $this->logger->info(
+                'Summary: Updated: ' . count($syncReviewsStatus->getSucceeded())
+                    . ', Skipped: ' . count($syncReviewsStatus->getSkipped())
+                    . ', Errors: ' . count($syncReviewsStatus->getErrors())
+                    . '.'
+            );
+
+            yield $this->archiveObsoleteReviews($syncReviewsStatus->getSucceeded());
         });
 
-        $errors = false;
+        return count($syncReviewsStatus->getErrors()) === 0;
+    }
 
-        Loop::run(function () use ($apps, &$errors): \Generator {
+    private function synchronizeReviews(): Promise
+    {
+        return \Amp\call(function (): \Generator {
+            $reviews = $this->putReviews();
             $count = 0;
             $updated = [];
+            $skipped = [];
+            $errors = [];
 
-            while (yield $apps->advance()) {
-                [$response, $app] = $apps->getCurrent();
-                $percent = ++$count / $app['total'] * 100 | 0;
+            while (yield $reviews->advance()) {
+                [$response, $app] = $reviews->getCurrent();
 
-                if ($response['success'] === 1) {
-                    $this->logger->info(
-                        "$count/$app[total] ($percent%) Synced #$app[app_id] $app[name] OK.",
-                        ['throttle' => $this->throttle]
-                    );
+                $logContext = [
+                    'app' => $app,
+                    'count' => ++$count,
+                    'total' => \count($reviews),
+                    'throttle' => $this->throttle,
+                ];
+
+                if (!isset($response['success'])) {
+                    $this->logger->warning("[$app[list_id]] Skipped %app%: \"$response\"", $logContext);
+
+                    $skipped[] = $app['app_id'];
+                } elseif ($response['success'] === 1) {
+                    $this->logger->info("[$app[list_id]] Synced %app% OK.", $logContext);
+
+                    $updated[] = $app['app_id'];
                 } else {
-                    $this->logger->error("Failed to sync #$app[app_id] $app[name]! Error code: $response[success].");
+                    $this->logger->error(
+                        "[$app[list_id]] Failed to sync %app%! Error code: $response[success].",
+                        $logContext
+                    );
 
-                    $errors = true;
+                    $errors[] = $app['app_id'];
                 }
-
-                $updated[] = $app['app_id'];
             }
 
-            yield $this->archiveObsoleteReviews($updated);
+            return new SyncReviewsStatus($updated, $skipped, $errors);
         });
+    }
 
-        return !$errors;
+    private function putReviews(): CountableIterator
+    {
+        $apps = $this->fetchReviewApps();
+
+        return new CountableIterator(
+            \count($apps),
+            new Producer(function (\Closure $emit) use ($apps): \Generator {
+                foreach ($apps as $app) {
+                    yield $this->throttle->await($emit(
+                        \Amp\call(function () use ($app): \Generator {
+                            try {
+                                return [
+                                    yield $this->porter->importOneAsync(
+                                        new PutSteamTop250ReviewSpecification($this->session, $this->curatorId, $app)
+                                    ),
+                                    $app,
+                                ];
+                            } catch (\Exception $exception) {
+                                return [$exception->getMessage(), $app];
+                            }
+                        })
+                    ));
+                }
+
+                yield $this->throttle->finish();
+            })
+        );
+    }
+
+    /**
+     * Fetches a collection of apps that can be pushed as curator reviews.
+     *
+     * Duplicate apps are filtered, leaving only the app whose ranking has the highest priority
+     * (determined by smallest priority value).
+     *
+     * @return iterable Collection of apps.
+     */
+    private function fetchReviewApps(): iterable
+    {
+        return $this->database->fetchAll('
+            WITH p(id, priority) AS (VALUES
+                (\'index\', 0),
+                (\'hidden_gems\', 1)
+            )
+            SELECT rank.*, app.id, name, total_reviews, positive_reviews, MIN(priority)
+            FROM rank
+            INNER JOIN app ON rank.app_id = app.id
+            INNER JOIN p ON p.id = list_id
+            GROUP BY app_id
+            ORDER BY priority, rank DESC
+        ');
     }
 
     private function archiveObsoleteReviews(array $freshAppIds): Promise

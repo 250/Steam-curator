@@ -8,8 +8,9 @@ language: php
 
 php: 7.1
 
-matrix:
-  fast_finish: true
+branches:
+  only:
+  - master
 
 cache:
   directories:

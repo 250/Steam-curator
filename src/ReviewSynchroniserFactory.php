@@ -12,7 +12,8 @@ final class ReviewSynchroniserFactory
         string $dbPath,
         int $curatorId,
         string $usernameOrCookie,
-        string $password = null
+        string $password = null,
+        bool $verbose = false
     ): ReviewSynchroniser {
         $porter = (new PorterFactory)->create();
 
@@ -21,7 +22,7 @@ final class ReviewSynchroniserFactory
             $curatorId,
             $porter,
             (new DatabaseFactory)->create($dbPath),
-            (new LoggerFactory)->create('Curator', false)
+            (new LoggerFactory)->create('Curator', $verbose)
         );
     }
 }

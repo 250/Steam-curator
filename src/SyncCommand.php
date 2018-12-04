@@ -29,7 +29,8 @@ final class SyncCommand extends Command
             $input->getArgument('db'),
             $input->getArgument('curator id') | 0,
             $input->getArgument('username'),
-            $input->getOption('password')
+            $input->getOption('password'),
+            $output->isVeryVerbose()
         );
 
         return $synchroniser->synchronize() ? 0 : 1;

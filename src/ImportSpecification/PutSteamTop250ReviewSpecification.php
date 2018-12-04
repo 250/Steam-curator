@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator\ImportSpecification;
 
+use ScriptFUSION\Porter\Connector\Recoverable\RecoverableException;
+use ScriptFUSION\Porter\Connector\Recoverable\StatelessRecoverableExceptionHandler;
+use ScriptFUSION\Porter\Net\Http\HttpServerException;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\PutCuratorReview;
@@ -36,5 +39,19 @@ final class PutSteamTop250ReviewSpecification extends AsyncImportSpecification
                 RecommendationState::RECOMMENDED()
             ))->setUrl("https://steam250.com/#app/$app[app_id]/" . rawurlencode($app['name']))
         ));
+
+        $this->setRecoverableExceptionHandler(new StatelessRecoverableExceptionHandler(
+            \Closure::fromCallable([$this, 'handleException'])
+        ));
+    }
+
+    private function handleException(RecoverableException $exception): void
+    {
+        if ($exception instanceof HttpServerException && $exception->getCode() === 400) {
+            $response = \json_decode($exception->getResponse()->getBody());
+            if ($response->success === 8) {
+                throw new \RuntimeException('Invalid param: app probably deleted.');
+            }
+        }
     }
 }
