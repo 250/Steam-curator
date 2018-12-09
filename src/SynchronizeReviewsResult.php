@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator;
 
-final class SyncReviewsStatus
+final class SynchronizeReviewsResult
 {
     private $succeeded;
 
