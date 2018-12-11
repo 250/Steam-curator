@@ -245,14 +245,16 @@ final class ReviewSynchroniser
             do {
                 $stale = $staleApps->getCurrent();
 
-                $this->logger->info("Archived obsolete review: $stale[app_name].");
+                $this->logger->info("Archiving obsolete review: #$stale[appid] $stale[app_name]...");
+
+                $ranking = Ranking::fromUrl($stale['recommendation']['link_url']);
 
                 yield $this->porter->importOneAsync(new AsyncImportSpecification(new PutCuratorReview(
                     $this->session,
                     $this->curatorId,
                     new CuratorReview(
                         $stale['appid'],
-                        "$stale[app_name] was a member of the Steam Top 250 until " . date('F jS, Y.'),
+                        "$stale[app_name] was a member of the {$ranking->getCanonicalName()} until " . date('F jS, Y.'),
                         RecommendationState::INFORMATIONAL()
                     )
                 )));

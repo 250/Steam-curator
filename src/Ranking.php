@@ -46,7 +46,7 @@ final class Ranking extends AbstractMultiton
         new static(
             'index',
             $priority = 0,
-            'Steam Top 100',
+            'Steam Top 250',
             'Top 100 best Steam games of all time according to gamer reviews.
             For the complete Top 250 ranking visit steam250.com.',
             'Steam game of all time',
@@ -61,6 +61,31 @@ final class Ranking extends AbstractMultiton
             'Steam Hidden Gem',
             '/hidden_gems'
         );
+    }
+
+    public static function fromUrl(string $url): Ranking
+    {
+        foreach (self::members() as $ranking) {
+            if (strpos($url, "{$ranking->getUrlPath()}#")) {
+                return $ranking;
+            }
+        }
+
+        throw new \RuntimeException("No ranking found matching URL: \"$url\".");
+    }
+
+    public function __toString()
+    {
+        return $this->id;
+    }
+
+    public function toCuratorList(): CuratorList
+    {
+        $list = new CuratorList;
+        $list->setTitle($this->getCanonicalName());
+        $list->setDescription($this->getDescription());
+
+        return $list;
     }
 
     public function getId(): string
@@ -91,19 +116,5 @@ final class Ranking extends AbstractMultiton
     public function getUrlPath(): string
     {
         return $this->urlPath;
-    }
-
-    public function __toString()
-    {
-        return $this->id;
-    }
-
-    public function toCuratorList(): CuratorList
-    {
-        $list = new CuratorList;
-        $list->setTitle($this->getCanonicalName());
-        $list->setDescription($this->getDescription());
-
-        return $list;
     }
 }
