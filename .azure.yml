@@ -1,0 +1,36 @@
+# https://docs.microsoft.com/azure/devops/pipelines/languages/php
+
+trigger:
+  - master
+
+variables:
+  phpVersion: 7.2
+
+steps:
+  - script: |
+      sudo update-alternatives --set php /usr/bin/php$(phpVersion)
+      sudo update-alternatives --set phar /usr/bin/phar$(phpVersion)
+      sudo update-alternatives --set phpdbg /usr/bin/phpdbg$(phpVersion)
+      sudo update-alternatives --set php-cgi /usr/bin/php-cgi$(phpVersion)
+      sudo update-alternatives --set phar.phar /usr/bin/phar.phar$(phpVersion)
+      php --version
+    displayName: Use PHP version $(phpVersion)
+
+  - script: sudo composer selfupdate
+    displayName: Update Composer
+
+  - script: composer validate
+    displayName: Validate Composer file
+
+  - script: |
+      composer global require hirak/prestissimo
+      composer install --no-interaction --no-progress --no-suggest
+    displayName: Install dependencies
+
+  - script: |
+      snapshots=$(vendor/bin/250\ data download-last2 | head -1)
+      echo "$snapshots"
+      echo "db: \"${db=$(cut -f3 <<<"$snapshots")}\""
+      echo "##vso[task.setvariable variable=DB]$db"
+
+  - script: bin/curator -v sync "$DB" 32686107 SteamTop250 -p "$(STEAM_PASSWORD)"
