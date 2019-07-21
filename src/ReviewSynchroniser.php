@@ -322,6 +322,8 @@ final class ReviewSynchroniser
                 ))));
             }
 
+            // TODO: Probably a bug. Removals must complete before any additions are made.
+
             $count = 0;
             $total = count($add);
             // Push additions.
