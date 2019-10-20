@@ -25,7 +25,7 @@ final class SyncCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): ?int
     {
-        $synchroniser = (new ReviewSynchroniserFactory)->create(
+        $synchroniser = (new ReviewSynchronizerFactory)->create(
             $input->getArgument('db'),
             $input->getArgument('curator id') | 0,
             $input->getArgument('username'),

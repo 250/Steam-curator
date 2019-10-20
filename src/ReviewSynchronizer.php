@@ -21,11 +21,13 @@ use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\PutCuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\RecommendationState;
 use ScriptFUSION\Porter\Specification\AsyncImportSpecification;
+use ScriptFUSION\Retry\FailingTooHardException;
 use ScriptFUSION\Steam250\Curator\ImportSpecification\GetCuratorListsSpecification;
 use ScriptFUSION\Steam250\Curator\ImportSpecification\ListObsoleteReviewsSpecification;
 use ScriptFUSION\Steam250\Curator\ImportSpecification\PutCuratorReviewSpecification;
+use function Amp\call;
 
-final class ReviewSynchroniser
+final class ReviewSynchronizer
 {
     private const MAX_LIST_LENGTH = 100;
 
@@ -39,6 +41,8 @@ final class ReviewSynchroniser
 
     private $logger;
 
+    private $throttle;
+
     public function __construct(
         CuratorSession $session,
         int $curatorId,
@@ -51,8 +55,15 @@ final class ReviewSynchroniser
         $this->porter = $porter;
         $this->database = $database;
         $this->logger = $logger;
+        $this->throttle = new Throttle(8, 6);
     }
 
+    /**
+     * 1. Fetch all ranking lists.
+     * 2. Synchronize each app's review.
+     * 3. Archive obsolete reviews.
+     * 4. Synchronize lists.
+     */
     public function synchronize(): bool
     {
         $this->logger->info('Beginning review synchronization...');
@@ -81,9 +92,12 @@ final class ReviewSynchroniser
         return count($syncReviewsStatus->getErrors()) === 0;
     }
 
+    /**
+     * Fetches each ranking list, containing all the reviewed app IDs.
+     */
     private function fetchLists(): Promise
     {
-        return \Amp\call(function (): \Generator {
+        return call(function (): \Generator {
             $listCollection = $this->porter->importAsync(
                 new GetCuratorListsSpecification($this->session, $this->curatorId)
             );
@@ -110,8 +124,8 @@ final class ReviewSynchroniser
 
     private function synchronizeReviews(): Promise
     {
-        return \Amp\call(function (): \Generator {
-            $reviews = $this->putReviews($throttle = self::createThrottle());
+        return call(function (): \Generator {
+            $reviews = $this->putReviews();
             $count = 0;
             $updated = [];
             $skipped = [];
@@ -124,7 +138,7 @@ final class ReviewSynchroniser
                     'app' => $app,
                     'count' => ++$count,
                     'total' => \count($reviews),
-                    'throttle' => $throttle,
+                    'throttle' => $this->throttle,
                 ];
 
                 if (!isset($response['success'])) {
@@ -149,16 +163,16 @@ final class ReviewSynchroniser
         });
     }
 
-    private function putReviews(Throttle $throttle): CountableIterator
+    private function putReviews(): CountableIterator
     {
         $apps = $this->fetchAllApps();
 
         return new CountableIterator(
             \count($apps),
-            new Producer(function (\Closure $emit) use ($throttle, $apps): \Generator {
+            new Producer(function (\Closure $emit) use ($apps): \Generator {
                 foreach ($apps as $app) {
-                    yield $throttle->await($emit(
-                        \Amp\call(function () use ($app): \Generator {
+                    yield $this->throttle->await($emit(
+                        call(function () use ($app): \Generator {
                             try {
                                 return [
                                     yield $this->porter->importOneAsync(
@@ -167,13 +181,18 @@ final class ReviewSynchroniser
                                     $app,
                                 ];
                             } catch (\Exception $exception) {
+                                // Error too serious to ignore.
+                                if ($exception instanceof FailingTooHardException) {
+                                    throw $exception;
+                                }
+
                                 return [$exception->getMessage(), $app];
                             }
                         })
                     ));
                 }
 
-                yield $throttle->finish();
+                yield $this->waitForPending();
             })
         );
     }
@@ -229,9 +248,18 @@ final class ReviewSynchroniser
         )->select('$v["app_id"]')->cast('int')->toArray();
     }
 
+    /**
+     * Archives obsolete reviews. Obsolete reviews are those marked as "recommended" but which no longer appear on any
+     * ranking list. Reviews are archived by changing their description and changing the recommendation state to
+     * "informational".
+     *
+     * @param array $freshAppIds
+     *
+     * @return Promise
+     */
     private function archiveObsoleteReviews(array $freshAppIds): Promise
     {
-        return \Amp\call(function () use ($freshAppIds) {
+        return call(function () use ($freshAppIds): \Generator {
             $staleApps = $this->porter->importAsync(
                 new ListObsoleteReviewsSpecification($this->session, $this->curatorId, $freshAppIds)
             );
@@ -245,26 +273,34 @@ final class ReviewSynchroniser
             do {
                 $stale = $staleApps->getCurrent();
 
-                $this->logger->info("Archiving obsolete review: #$stale[appid] $stale[app_name]...");
+                $this->logger->info(
+                    "Archiving obsolete review: #$stale[appid] $stale[app_name]...",
+                    ['throttle' => $this->throttle]
+                );
 
                 $ranking = Ranking::fromUrl($stale['recommendation']['link_url']);
 
-                yield $this->porter->importOneAsync(new AsyncImportSpecification(new PutCuratorReview(
-                    $this->session,
-                    $this->curatorId,
-                    new CuratorReview(
-                        $stale['appid'],
-                        "$stale[app_name] was a member of the {$ranking->getCanonicalName()} until " . date('F jS, Y.'),
-                        RecommendationState::INFORMATIONAL()
-                    )
-                )));
+                yield $this->throttle->await(
+                    $promise = $this->porter->importOneAsync(new AsyncImportSpecification(new PutCuratorReview(
+                        $this->session,
+                        $this->curatorId,
+                        new CuratorReview(
+                            $stale['appid'],
+                            "$stale[app_name] was a member of the {$ranking->getCanonicalName()} until "
+                                . date('F jS, Y.'),
+                            RecommendationState::INFORMATIONAL()
+                        )
+                    )))
+                );
+
+                Promise\rethrow($promise);
             } while (yield $staleApps->advance());
         });
     }
 
     private function synchronizeLists(array $lists, SynchronizeReviewsResult $syncReviewsStatus): Promise
     {
-        return \Amp\call(function () use ($lists, $syncReviewsStatus): \Generator {
+        return call(function () use ($lists, $syncReviewsStatus): \Generator {
             foreach (Ranking::members() as $ranking) {
                 $list = $lists[$ranking->getCanonicalName()];
 
@@ -305,11 +341,9 @@ final class ReviewSynchroniser
         $remove = array_diff($curatorList->getAppIds(), $newAppIds);
 
         return new Producer(function (\Closure $emit) use ($add, $remove, $curatorList, $newAppIds): \Generator {
-            $throttle = self::createThrottle();
-
             $count = 0;
             $total = count($remove);
-            $logContext = ['throttle' => $throttle, 'count' => &$count, 'total' => &$total];
+            $logContext = ['throttle' => $this->throttle, 'count' => &$count, 'total' => &$total];
 
             // Push removals. Removals must be pushed before adds to avoid overflowing the list length limit.
             foreach ($remove as $appId) {
@@ -317,12 +351,12 @@ final class ReviewSynchroniser
 
                 $this->logger->info("[{$curatorList->getTitle()}] Removing: #$appId...", $logContext);
 
-                yield $throttle->await($emit($this->porter->importOneAsync(new AsyncImportSpecification(
+                yield $this->throttle->await($emit($this->porter->importOneAsync(new AsyncImportSpecification(
                     new DeleteCuratorListApp($this->session, $this->curatorId, $curatorList->getListId(), $appId)
                 ))));
             }
 
-            // TODO: Probably a bug. Removals must complete before any additions are made.
+            yield $this->waitForPending();
 
             $count = 0;
             $total = count($add);
@@ -332,36 +366,45 @@ final class ReviewSynchroniser
 
                 $this->logger->info("[{$curatorList->getTitle()}] Adding: #$appId...", $logContext);
 
-                yield $throttle->await($emit($this->porter->importOneAsync(new AsyncImportSpecification(
+                yield $this->throttle->await($emit($this->porter->importOneAsync(new AsyncImportSpecification(
                     new PutCuratorListApp($this->session, $this->curatorId, $curatorList->getListId(), $appId)
                 ))));
             }
 
-            yield $throttle->finish();
+            yield $this->waitForPending();
 
-            $this->logger->info("[{$curatorList->getTitle()}] Syncing list attributes...", compact('throttle'));
+            $this->logger->info(
+                "[{$curatorList->getTitle()}] Syncing list attributes...",
+                $logContext = ['throttle' => $this->throttle]
+            );
 
-            yield $emit($this->porter->importOneAsync(new AsyncImportSpecification(
+            yield $this->throttle->await($emit($this->porter->importOneAsync(new AsyncImportSpecification(
                 new PutCuratorList($this->session, $this->curatorId, $curatorList)
-            )));
+            ))));
 
             if ($newAppIds) {
-                $this->logger->info("[{$curatorList->getTitle()}] Reordering apps...", compact('throttle'));
+                $this->logger->info("[{$curatorList->getTitle()}] Reordering apps...", $logContext);
 
-                yield $emit($this->porter->importOneAsync(new AsyncImportSpecification(
+                yield $this->throttle->await($emit($this->porter->importOneAsync(new AsyncImportSpecification(
                     new PatchCuratorListAppOrder(
                         $this->session,
                         $this->curatorId,
                         $curatorList->getListId(),
                         $newAppIds
                     )
-                )));
+                ))));
             }
+
+            yield $this->waitForPending();
         });
     }
 
-    private static function createThrottle(): Throttle
+    private function waitForPending(): Promise
     {
-        return new Throttle(6, 6);
+        return call(function (): \Generator {
+            $this->logger->debug('Waiting for pending requests...');
+
+            yield $this->throttle->getAwaiting();
+        });
     }
 }

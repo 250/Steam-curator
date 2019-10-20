@@ -12,17 +12,17 @@
     "ext-intl": "*",
     "ext-json": "*",
     "250/shared": "dev-master",
-    "provider/steam": "dev-async",
-    "transformers/mapping-transformer": "5.0.x-dev",
-    "scriptfusion/porter": "@dev",
+    "amphp/amp": "^2",
+    "async/throttle": "^2.0",
     "connectors/http": "@dev",
     "connectors/ssl": "@dev",
-    "amphp/amp": "2.1.1",
-    "async/throttle": "^1.1",
-    "joomla/di": "^1.5",
     "doctrine/dbal": "^2",
+    "joomla/di": "^1.5",
     "monolog/monolog": "^1",
-    "symfony/console": "^3"
+    "provider/steam": "dev-async",
+    "scriptfusion/porter": "@dev",
+    "symfony/console": "^3",
+    "transformers/mapping-transformer": "5.0.x-dev"
   },
   "require-dev": {
     "phpunit/phpunit": "^6"
@@ -31,5 +31,8 @@
     "psr-4": {
       "ScriptFUSION\\Steam250\\Curator\\": "src"
     }
+  },
+  "config": {
+    "sort-packages": true
   }
 }
