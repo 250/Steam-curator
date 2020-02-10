@@ -8,21 +8,19 @@
     }
   ],
   "require": {
-    "php": "^7.1",
+    "php": "^7.4",
     "ext-intl": "*",
     "ext-json": "*",
-    "250/shared": "dev-master",
-    "amphp/amp": "^2",
-    "async/throttle": "^2.0",
-    "connectors/http": "@dev",
-    "connectors/ssl": "@dev",
+    "250/log": "dev-master",
+    "250/storage": "dev-master",
+    "async/throttle": "^2",
+    "athari/yalinqo": "^2.4",
     "doctrine/dbal": "^2",
     "joomla/di": "^1.5",
     "monolog/monolog": "^1",
-    "provider/steam": "dev-async",
-    "scriptfusion/porter": "@dev",
+    "provider/steam": "^2",
     "symfony/console": "^3",
-    "transformers/mapping-transformer": "5.0.x-dev"
+    "transformers/mapping-transformer": "^2"
   },
   "require-dev": {
     "phpunit/phpunit": "^6"

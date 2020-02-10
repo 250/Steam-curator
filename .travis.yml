@@ -6,7 +6,7 @@ sudo: false
 
 language: php
 
-php: '7.3'
+php: '7.4'
 
 branches:
   only:
@@ -26,4 +26,4 @@ before_script:
   - 'echo "db: \"${db=$(cut -f3 <<<"$snapshots")}\""'
 
 script:
-  - bin/curator -v sync "$db" 32686107 Club_250 -p "$STEAM_PASSWORD" || exit
+  - bin/curator -v sync "$db" 32686107 Club_250 -p "$STEAM_PASSWORD"
