@@ -44,7 +44,7 @@ final class Ranking extends AbstractMultiton
     protected static function initializeMembers(): void
     {
         new static(
-            'index',
+            'top250',
             $priority = 0,
             'Steam Top 250',
             'Top 100 best Steam games of all time according to gamer reviews.
