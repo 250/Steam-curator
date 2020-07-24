@@ -50,7 +50,7 @@ final class Ranking extends AbstractMultiton
             'Top 100 best Steam games of all time according to gamer reviews.
             For the complete Top 250 ranking visit steam250.com.',
             'Steam game of all time',
-            '/'
+            '/top250'
         );
 
         new static(
