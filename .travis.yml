@@ -8,10 +8,6 @@ language: php
 
 php: '7.4'
 
-branches:
-  only:
-  - master
-
 cache:
   directories:
     - vendor
