@@ -1,0 +1,41 @@
+name: Curator sync
+
+on: push
+
+jobs:
+  Sync:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 7.4
+
+      - name: Validate composer.json
+        run: composer validate
+
+      - name: Cache dependencies
+        id: composer-cache
+        uses: actions/cache@v2
+        with:
+          path: vendor
+          key: php-${{ hashFiles('composer.lock') }}
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      - name: Acquire snapshots
+        run: |
+          snapshots=$(vendor/bin/250\ data download-last2 | head -1) && echo "$snapshots"
+          echo "db=\"$(cut -f3 <<<"$snapshots")\"" | tee -a "$GITHUB_ENV"
+        env:
+          GOOGLE_CLIENT_SECRET : ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+
+      - name: Curator sync
+        run: bin/curator -v sync "${{ env.db }}" 32686107 Club_250 -p "$STEAM_PASSWORD"
+        env:
+          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
