@@ -1,6 +1,10 @@
 name: Curator sync
 
-on: push
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
 
 jobs:
   Sync:
@@ -32,7 +36,7 @@ jobs:
           snapshots=$(vendor/bin/250\ data download-last2 | head -1) && echo "$snapshots"
           echo "db=\"$(cut -f3 <<<"$snapshots")\"" | tee -a "$GITHUB_ENV"
         env:
-          GOOGLE_CLIENT_SECRET : ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
 
       - name: Curator sync
