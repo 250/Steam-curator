@@ -3,29 +3,15 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator;
 
-use Amp\Iterator;
-use Amp\Promise;
-
-class CountableIterator implements Iterator, \Countable
+class CountableIterator implements \IteratorAggregate, \Countable
 {
-    private $count;
-
-    private $iterator;
-
-    public function __construct(int $count, Iterator $iterator)
+    public function __construct(private readonly int $count, private readonly \Iterator $iterator)
     {
-        $this->count = $count;
-        $this->iterator = $iterator;
     }
 
-    public function advance(): Promise
+    public function getIterator(): \Traversable
     {
-        return $this->iterator->advance();
-    }
-
-    public function getCurrent()
-    {
-        return $this->iterator->getCurrent();
+        return $this->iterator;
     }
 
     public function count(): int

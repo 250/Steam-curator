@@ -1,18 +1,18 @@
 <?php
 declare(strict_types=1);
 
-namespace ScriptFUSION\Steam250\Curator\ImportSpecification;
+namespace ScriptFUSION\Steam250\Curator\Import;
 
 use ScriptFUSION\Mapper\AnonymousMapping;
 use ScriptFUSION\Mapper\Strategy\Collection;
 use ScriptFUSION\Mapper\Strategy\Copy;
 use ScriptFUSION\Mapper\Strategy\CopyContext;
+use ScriptFUSION\Porter\Import\Import;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorList\GetCuratorLists;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
-use ScriptFUSION\Porter\Specification\AsyncImportSpecification;
 use ScriptFUSION\Porter\Transform\Mapping\MappingTransformer;
 
-final class GetCuratorListsSpecification extends AsyncImportSpecification
+final class GetCuratorListsImport extends Import
 {
     public function __construct(CuratorSession $session, int $curatorId)
     {

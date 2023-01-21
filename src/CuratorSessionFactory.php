@@ -12,11 +12,9 @@ final class CuratorSessionFactory
     public function create(Porter $porter, string $usernameOrCookie, string $password = null): CuratorSession
     {
         if ($password === null) {
-            $promise = CuratorSession::createFromCookie(SecureLoginCookie::create($usernameOrCookie), $porter);
-        } else {
-            $promise = CuratorSession::create($porter, $usernameOrCookie, $password);
+            return CuratorSession::createFromCookie(SecureLoginCookie::create($usernameOrCookie), $porter);
         }
 
-        return \Amp\Promise\wait($promise);
+        return CuratorSession::create($porter, $usernameOrCookie, $password);
     }
 }

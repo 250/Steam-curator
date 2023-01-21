@@ -71,6 +71,11 @@ final class Ranking extends AbstractMultiton
             }
         }
 
+        // Old format, when Top 250 ranking was the home page.
+        if (str_starts_with($url, 'https://steam250.com/#app')) {
+            return self::memberByKey('top250');
+        }
+
         throw new \RuntimeException("No ranking found matching URL: \"$url\".");
     }
 

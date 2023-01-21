@@ -1,19 +1,19 @@
 <?php
 declare(strict_types=1);
 
-namespace ScriptFUSION\Steam250\Curator\ImportSpecification;
+namespace ScriptFUSION\Steam250\Curator\Import;
 
 use ScriptFUSION\Porter\Connector\Recoverable\RecoverableException;
 use ScriptFUSION\Porter\Connector\Recoverable\StatelessRecoverableExceptionHandler;
+use ScriptFUSION\Porter\Import\Import;
 use ScriptFUSION\Porter\Net\Http\HttpServerException;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\PutCuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\RecommendationState;
-use ScriptFUSION\Porter\Specification\AsyncImportSpecification;
 use ScriptFUSION\Steam250\Curator\Ranking;
 
-final class PutCuratorReviewSpecification extends AsyncImportSpecification
+final class PutCuratorReviewImport extends Import
 {
     private const LANG = 'en';
 
@@ -43,9 +43,7 @@ final class PutCuratorReviewSpecification extends AsyncImportSpecification
             ))->setUrl("https://steam250.com{$ranking->getUrlPath()}#app/$app[app_id]/" . rawurlencode($app['name']))
         ));
 
-        $this->setRecoverableExceptionHandler(new StatelessRecoverableExceptionHandler(
-            \Closure::fromCallable([$this, 'handleException'])
-        ));
+        $this->setRecoverableExceptionHandler(new StatelessRecoverableExceptionHandler($this->handleException(...)));
     }
 
     private function handleException(RecoverableException $exception): void

@@ -8,22 +8,22 @@ on:
 
 jobs:
   Sync:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 7.4
+          php-version: 8.1
 
       - name: Validate composer.json
         run: composer validate
 
       - name: Cache dependencies
         id: composer-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: vendor
           key: php-${{ hashFiles('composer.lock') }}
