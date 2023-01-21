@@ -21,7 +21,7 @@
     "joomla/di": "^2",
     "monolog/monolog": "^1",
     "provider/steam": "^7",
-    "symfony/console": "^3",
+    "symfony/console": "^6",
     "transformers/mapping-transformer": "^3"
   },
   "require-dev": {
