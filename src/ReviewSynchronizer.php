@@ -38,7 +38,7 @@ final class ReviewSynchronizer
         private readonly Connection $database,
         private readonly LoggerInterface $logger
     ) {
-        $this->throttle = new DualThrottle(8, 6);
+        $this->throttle = new DualThrottle(7, 6);
     }
 
     /**
@@ -191,11 +191,7 @@ final class ReviewSynchronizer
 
     private static function createRankingPriorityCteFragment(): string
     {
-        return from(Ranking::members())
-            ->select(static function (Ranking $ranking): string {
-                return "('{$ranking}', {$ranking->getPriority()})";
-            })
-            ->toString(',');
+        return implode(',', array_map(fn ($ranking) => "('$ranking', {$ranking->getPriority()})", Ranking::members()));
     }
 
     /**
@@ -207,14 +203,15 @@ final class ReviewSynchronizer
      */
     private function fetchRankingApps(Ranking $rankingName): array
     {
-        return from(
+        return array_map(
+            fn (array $row) => $row['app_id'],
             $this->database->fetchAllAssociative("
                 SELECT app_id
                 FROM rank
                 WHERE list_id = '$rankingName'
                 ORDER BY rank
             ")
-        )->select(fn ($v) => $v['app_id'])->cast('int')->toArray();
+        );
     }
 
     /**

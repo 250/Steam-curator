@@ -6,44 +6,22 @@ namespace ScriptFUSION\Steam250\Curator;
 use Eloquent\Enumeration\AbstractMultiton;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorList\CuratorList;
 
-/**
- * @method static self[] members()
- */
 final class Ranking extends AbstractMultiton
 {
-    private $id;
-
-    private $priority;
-
-    private $cName;
-
-    private $description;
-
-    private $ratingDescription;
-
-    private $urlPath;
-
     protected function __construct(
-        string $id,
-        int $priority,
-        string $cName,
-        string $description,
-        string $ratedDescription,
-        string $urlPath
+        private readonly string $id,
+        private readonly int $priority,
+        private readonly string $cName,
+        private readonly string $description,
+        private readonly string $ratingDescription,
+        private readonly string $urlPath
     ) {
         parent::__construct($id);
-
-        $this->id = $id;
-        $this->priority = $priority;
-        $this->cName = $cName;
-        $this->description = $description;
-        $this->ratingDescription = $ratedDescription;
-        $this->urlPath = $urlPath;
     }
 
     protected static function initializeMembers(): void
     {
-        new static(
+        new self(
             'top250',
             $priority = 0,
             'Steam Top 250',
@@ -53,7 +31,7 @@ final class Ranking extends AbstractMultiton
             '/top250'
         );
 
-        new static(
+        new self(
             'hidden_gems',
             ++$priority,
             'Hidden Gems',
@@ -77,11 +55,6 @@ final class Ranking extends AbstractMultiton
         }
 
         throw new \RuntimeException("No ranking found matching URL: \"$url\".");
-    }
-
-    public function __toString()
-    {
-        return $this->id;
     }
 
     public function toCuratorList(): CuratorList

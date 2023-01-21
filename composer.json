@@ -16,7 +16,6 @@
     "250/log": "dev-master",
     "250/storage": "dev-master",
     "async/throttle": "^4",
-    "athari/yalinqo": "^2.4",
     "doctrine/dbal": "^2",
     "joomla/di": "^2",
     "monolog/monolog": "^1",
@@ -25,7 +24,6 @@
     "transformers/mapping-transformer": "^3"
   },
   "require-dev": {
-    "phpunit/phpunit": "^9.5.28",
     "roave/security-advisories": "dev-latest"
   },
   "autoload": {
