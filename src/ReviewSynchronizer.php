@@ -38,7 +38,7 @@ final class ReviewSynchronizer
         private readonly Connection $database,
         private readonly LoggerInterface $logger
     ) {
-        $this->throttle = new DualThrottle(7, 6);
+        $this->throttle = new DualThrottle(6, 6);
     }
 
     /**
