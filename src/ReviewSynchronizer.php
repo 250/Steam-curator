@@ -66,6 +66,8 @@ final class ReviewSynchronizer
 
         $this->synchronizeLists($lists, $syncReviewsStatus);
 
+        $this->logger->info('All done :^)');
+
         return count($syncReviewsStatus->getErrors()) === 0;
     }
 
