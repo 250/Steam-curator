@@ -149,7 +149,8 @@ final class ReviewSynchronizer
                             try {
                                 return [
                                     $this->porter->importOne(
-                                        new PutCuratorReviewImport($this->session, $this->curatorId, $app)
+                                        (new PutCuratorReviewImport($this->session, $this->curatorId, $app))
+                                            ->setLogger($this->logger)
                                     ),
                                     $app,
                                 ];

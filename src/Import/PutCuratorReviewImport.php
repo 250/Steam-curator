@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator\Import;
 
+use Psr\Log\LoggerInterface;
+use ScriptFUSION\Porter\Connector\Recoverable\RecoverableExceptionHandler;
 use ScriptFUSION\Porter\Import\Import;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
@@ -14,6 +16,7 @@ final class PutCuratorReviewImport extends Import
 {
     private const LANG = 'en';
 
+    private RecoverableExceptionHandler $exceptionHandler;
 
     public function __construct(CuratorSession $session, int $curatorId, array $app)
     {
@@ -41,6 +44,15 @@ final class PutCuratorReviewImport extends Import
             ))->setUrl("https://steam250.com{$ranking->getUrlPath()}#app/$app[app_id]/" . rawurlencode($app['name']))
         ));
 
-        $this->setRecoverableExceptionHandler(new PutCuratorReviewExceptionHandler);
+        $this->setRecoverableExceptionHandler(
+            $this->exceptionHandler = new PutCuratorReviewExceptionHandler($app['app_id'])
+        );
+    }
+
+    public function setLogger(LoggerInterface $logger): self
+    {
+        $this->exceptionHandler->setLogger($logger);
+
+        return $this;
     }
 }
