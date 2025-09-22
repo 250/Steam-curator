@@ -9,7 +9,7 @@ use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
 
 final class CuratorSessionFactory
 {
-    public function create(Porter $porter, string $usernameOrCookie, string $password = null): CuratorSession
+    public function create(Porter $porter, string $usernameOrCookie, ?string $password = null): CuratorSession
     {
         if ($password === null) {
             return CuratorSession::createFromCookie(SecureLoginCookie::create($usernameOrCookie), $porter);

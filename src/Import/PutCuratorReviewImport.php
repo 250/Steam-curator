@@ -24,7 +24,7 @@ final class PutCuratorReviewImport extends Import
         $percent = new \NumberFormatter(self::LANG, \NumberFormatter::PERCENT);
         $ordinal = new \NumberFormatter(self::LANG, \NumberFormatter::ORDINAL);
 
-        $ranking = Ranking::memberByKey($app['list_id']);
+        $ranking = Ranking::from($app['list_id']);
 
         parent::__construct(new PutCuratorReview(
             $session,
@@ -40,7 +40,7 @@ final class PutCuratorReviewImport extends Import
                     . " {$ranking->getRatingDescription()}, with "
                     . $percent->format($app['positive_reviews'] / $app['total_reviews'])
                     . " positive reviews from {$number->format($app['total_reviews'])} gamers!",
-                RecommendationState::RECOMMENDED()
+                RecommendationState::RECOMMENDED
             ))->setUrl("https://steam250.com{$ranking->getUrlPath()}#app/$app[app_id]/" . rawurlencode($app['name']))
         ));
 

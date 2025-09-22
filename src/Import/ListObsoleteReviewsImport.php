@@ -16,7 +16,7 @@ final class ListObsoleteReviewsImport extends Import
         parent::__construct(new GetCuratorReviews($session, $curatorId));
 
         $this->addTransformer(new FilterTransformer(static function (array $record) use ($freshAppIds): bool {
-            return $record['recommendation']['recommendation_state'] === RecommendationState::RECOMMENDED()->toInt()
+            return $record['recommendation']['recommendation_state'] === RecommendationState::RECOMMENDED->toInt()
                 && !\in_array($record['appid'], $freshAppIds, false);
         }));
     }

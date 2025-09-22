@@ -92,7 +92,7 @@ final class ReviewSynchronizer
 
     private static function validateLists(array $lists): void
     {
-        foreach (Ranking::members() as $ranking) {
+        foreach (Ranking::cases() as $ranking) {
             if (!isset($lists[$ranking->getCanonicalName()])) {
                 throw new \RuntimeException("Required ranking not found: \"{$ranking->getCanonicalName()}\".");
             }
@@ -194,7 +194,10 @@ final class ReviewSynchronizer
 
     private static function createRankingPriorityCteFragment(): string
     {
-        return implode(',', array_map(fn ($ranking) => "('$ranking', {$ranking->getPriority()})", Ranking::members()));
+        return implode(',', array_map(
+            fn ($ranking) => "('{$ranking->getId()}', {$ranking->getPriority()})",
+            Ranking::cases()
+        ));
     }
 
     /**
@@ -211,7 +214,7 @@ final class ReviewSynchronizer
             $this->database->fetchAllAssociative("
                 SELECT app_id
                 FROM rank
-                WHERE list_id = '$rankingName'
+                WHERE list_id = '{$rankingName->getId()}'
                 ORDER BY rank
             ")
         );
@@ -244,7 +247,7 @@ final class ReviewSynchronizer
                         $stale['appid'],
                         "$stale[app_name] was a member of the {$ranking->getCanonicalName()} until "
                             . date('F jS, Y.'),
-                        RecommendationState::INFORMATIONAL()
+                        RecommendationState::INFORMATIONAL
                     )
                 )))
             )->await();
@@ -255,7 +258,7 @@ final class ReviewSynchronizer
 
     private function synchronizeLists(array $lists, SynchronizeReviewsResult $syncReviewsStatus): void
     {
-        foreach (Ranking::members() as $ranking) {
+        foreach (Ranking::cases() as $ranking) {
             $list = $lists[$ranking->getCanonicalName()];
 
             $curatorList = $ranking->toCuratorList();

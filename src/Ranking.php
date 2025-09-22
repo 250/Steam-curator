@@ -3,47 +3,16 @@ declare(strict_types=1);
 
 namespace ScriptFUSION\Steam250\Curator;
 
-use Eloquent\Enumeration\AbstractMultiton;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorList\CuratorList;
 
-final class Ranking extends AbstractMultiton
+enum Ranking: string
 {
-    protected function __construct(
-        private readonly string $id,
-        private readonly int $priority,
-        private readonly string $cName,
-        private readonly string $description,
-        private readonly string $ratingDescription,
-        private readonly string $urlPath
-    ) {
-        parent::__construct($id);
-    }
-
-    protected static function initializeMembers(): void
-    {
-        new self(
-            'top250',
-            $priority = 0,
-            'Steam Top 250',
-            'Top 100 best Steam games of all time according to gamer reviews.
-            For the complete Top 250 ranking visit steam250.com.',
-            'Steam game of all time',
-            '/top250'
-        );
-
-        new self(
-            'hidden_gems',
-            ++$priority,
-            'Hidden Gems',
-            'Top 100 highly rated Steam games that few know but many love.',
-            'Steam Hidden Gem',
-            '/hidden_gems'
-        );
-    }
+    case Top250 = 'top250';
+    case HiddenGems = 'hidden_gems';
 
     public static function fromUrl(string $url): Ranking
     {
-        foreach (self::members() as $ranking) {
+        foreach (self::cases() as $ranking) {
             if (strpos($url, "{$ranking->getUrlPath()}#")) {
                 return $ranking;
             }
@@ -51,7 +20,7 @@ final class Ranking extends AbstractMultiton
 
         // Old format, when Top 250 ranking was the home page.
         if (str_starts_with($url, 'https://steam250.com/#app')) {
-            return self::memberByKey('top250');
+            return self::Top250;
         }
 
         throw new \RuntimeException("No ranking found matching URL: \"$url\".");
@@ -68,31 +37,47 @@ final class Ranking extends AbstractMultiton
 
     public function getId(): string
     {
-        return $this->id;
+        return $this->value;
     }
 
     public function getPriority(): int
     {
-        return $this->priority;
+        return match ($this) {
+            self::Top250 => 0,
+            self::HiddenGems => 1,
+        };
     }
 
     public function getCanonicalName(): string
     {
-        return $this->cName;
+        return match ($this) {
+            self::Top250 => 'Steam Top 250',
+            self::HiddenGems => 'Hidden Gems',
+        };
     }
 
     public function getDescription(): string
     {
-        return $this->description;
+        return match ($this) {
+            self::Top250 => 'Top 100 best Steam games of all time according to gamer reviews.'
+                . ' For the complete Top 250 ranking visit steam250.com.',
+            self::HiddenGems => 'Top 100 highly rated Steam games that few know but many love.',
+        };
     }
 
     public function getRatingDescription(): string
     {
-        return $this->ratingDescription;
+        return match ($this) {
+            self::Top250 => 'Steam game of all time',
+            self::HiddenGems => 'Steam Hidden Gem',
+        };
     }
 
     public function getUrlPath(): string
     {
-        return $this->urlPath;
+        return match ($this) {
+            self::Top250 => '/top250',
+            self::HiddenGems => '/hidden_gems',
+        };
     }
 }

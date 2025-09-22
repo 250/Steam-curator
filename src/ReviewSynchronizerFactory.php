@@ -12,7 +12,7 @@ final class ReviewSynchronizerFactory
         string $dbPath,
         int $curatorId,
         string $usernameOrCookie,
-        string $password = null,
+        ?string $password = null,
         bool $verbose = false
     ): ReviewSynchronizer {
         $porter = (new PorterFactory)->create();
