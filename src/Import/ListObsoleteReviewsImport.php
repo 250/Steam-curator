@@ -9,6 +9,9 @@ use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\GetCuratorReviews;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\RecommendationState;
 use ScriptFUSION\Porter\Transform\FilterTransformer;
 
+/**
+ * In this context, obsolete means reviews that no longer appear on any ranking.
+ */
 final class ListObsoleteReviewsImport extends Import
 {
     public function __construct(CuratorSession $session, int $curatorId, array $freshAppIds)

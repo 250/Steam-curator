@@ -17,10 +17,12 @@ use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorList\PutCuratorLi
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorList\PutCuratorListApp;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\CuratorSession;
+use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\DeleteCuratorReviews;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\PutCuratorReview;
 use ScriptFUSION\Porter\Provider\Steam\Resource\Curator\RecommendationState;
 use ScriptFUSION\Retry\FailingTooHardException;
 use ScriptFUSION\Steam250\Curator\Import\GetCuratorListsImport;
+use ScriptFUSION\Steam250\Curator\Import\GetCuratorReviewsImport;
 use ScriptFUSION\Steam250\Curator\Import\ListObsoleteReviewsImport;
 use ScriptFUSION\Steam250\Curator\Import\PutCuratorReviewImport;
 use function Amp\Future\await;
@@ -28,6 +30,14 @@ use function Amp\Future\await;
 final class ReviewSynchronizer
 {
     private const MAX_LIST_LENGTH = 100;
+
+    public const DATE_FORMAT = 'F jS, Y.';
+
+    // Steam sets this limit.
+    private const MAX_REVIEWS = 2_000;
+
+    // Number of reviews to drop when approaching the limit.
+    private const REVIEW_HEADROOM = 50;
 
     private Throttle $throttle;
 
@@ -42,16 +52,19 @@ final class ReviewSynchronizer
     }
 
     /**
-     * 1. Fetch all ranking lists.
-     * 2. Synchronize each app's review.
-     * 3. Archive obsolete reviews.
-     * 4. Synchronize lists.
+     * 1. Fetch all curator rankings as of the last update.
+     * 2. Delete old reviews to keep headroom under the limit.
+     * 3. Synchronize each app's review using our latest database snapshot.
+     * 4. Archive obsolete reviews by reconciling the snapshot with the last update.
+     * 5. Synchronize curator rankings with the latest snapshot.
      */
     public function synchronize(): bool
     {
         $this->logger->info('Beginning review synchronization...');
 
         $lists = $this->fetchLists();
+
+        $this->deleteOldReviews();
 
         $syncReviewsStatus = $this->synchronizeReviews();
 
@@ -97,6 +110,53 @@ final class ReviewSynchronizer
                 throw new \RuntimeException("Required ranking not found: \"{$ranking->getCanonicalName()}\".");
             }
         }
+    }
+
+    private function deleteOldReviews(): void
+    {
+        /** @var \ScriptFUSION\Steam250\Curator\CuratorReview[] $reviews */
+        $reviews = iterator_to_array($this->porter->import(
+            new GetCuratorReviewsImport($this->session, $this->curatorId)
+        ));
+
+        $crc = 'Current review count: ' . count($reviews) . '/' . self::MAX_REVIEWS ;
+        if (count($reviews) <= self::MAX_REVIEWS - self::REVIEW_HEADROOM) {
+            $this->logger->info("No reviews to delete. $crc.");
+
+            return;
+        }
+
+        $toDelete = count($reviews) - self::MAX_REVIEWS + self::REVIEW_HEADROOM;
+        $this->logger->info("Deleting $toDelete old reviews. $crc...");
+
+        $informational = array_filter(
+            $reviews,
+            static fn ($review) => $review->recommendationState === RecommendationState::INFORMATIONAL
+        );
+        usort(
+            $informational,
+            static fn ($a, $b) =>
+                // Remove Hidden Gems before Steam Top 250.
+                $b->ranking->getPriority() <=> $a->ranking->getPriority()
+                    // Remove older reviews before newer ones.
+                    ?: $a->lastRecommended <=> $b->lastRecommended
+        );
+
+        $delete = array_slice($informational, 0, max(0, $toDelete));
+
+        foreach ($delete as $review) {
+            $this->logger->info(
+                "Deleting old review: #$review->appId $review->appName ({$review->ranking->getCanonicalName()}"
+                    . " from {$review->lastRecommended->format(self::DATE_FORMAT)})"
+            );
+        }
+
+        $response = $this->porter->importOne(new Import(new DeleteCuratorReviews(
+            $this->session,
+            $this->curatorId,
+            array_map(static fn ($review) => $review->appId, $delete)
+        )));
+        assert($response['success'] === 1);
     }
 
     private function synchronizeReviews(): SynchronizeReviewsResult
@@ -246,7 +306,7 @@ final class ReviewSynchronizer
                     new CuratorReview(
                         $stale['appid'],
                         "$stale[app_name] was a member of the {$ranking->getCanonicalName()} until "
-                            . date('F jS, Y.'),
+                            . date(self::DATE_FORMAT),
                         RecommendationState::INFORMATIONAL
                     )
                 )))
